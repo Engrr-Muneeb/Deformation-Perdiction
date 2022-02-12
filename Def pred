@@ -1,0 +1,105 @@
+from pandas import read_csv
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from keras.layers import PReLU
+import pandas as pd
+# import dataset and drop missing datasets
+df = pd.read_csv('df.csv').dropna()
+
+#Seperate fetaures and labels
+X = df.drop('Def' , axis =1)
+y = df.Def
+
+#Split data sets 20% test set
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=0)
+
+print ('Training Set: %d rows\nTest Set: %d rows' % (X_train.shape[0], X_test.shape[0]))
+
+
+#Scale data, otherwise model will fail.
+#Standardize features by removing the mean and scaling to unit variance
+from sklearn.preprocessing import StandardScaler
+scaler=StandardScaler()
+scaler.fit(X_train)
+
+X_train_scaled = scaler.transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# define the model
+#Experiment with deeper and wider networks
+model = Sequential()
+model.add(Dense(128, input_dim=6, activation='gelu'))
+model.add(Dense(128, activation='gelu'))
+model.add(Dense(128, activation='gelu'))
+model.add(Dense(228, activation='gelu'))
+model.add(Dense(228, activation='gelu'))
+model.add(Dense(128, activation='gelu'))
+model.add(Dense(64, activation='gelu'))
+#Output layer
+model.add(Dense(1, activation='gelu'))
+
+model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mae'])
+model.summary()
+
+#Train The model
+history = model.fit(X_train_scaled, y_train, validation_split=0.2, epochs =300)
+
+#Evaluate the model
+from matplotlib import pyplot as plt
+#plot the training and validation accuracy and loss at each epoch
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(1, len(loss) + 1)
+plt.plot(epochs, loss, 'y', label='Training loss')
+plt.plot(epochs, val_loss, 'r', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+acc = history.history['mae']
+val_acc = history.history['val_mae']
+plt.plot(epochs, acc, 'y', label='Training MAE')
+plt.plot(epochs, val_acc, 'r', label='Validation MAE')
+plt.title('Training and validation MAE')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+#Predict on test data
+predictions = model.predict(X_test_scaled)
+print("Predicted values are: ", predictions[:5])
+print("Real values are: ", y_test[:5])
+
+#print msa and mae
+mse_neural, mae_neural = model.evaluate(X_test_scaled, y_test)
+print('Mean squared error from neural net: ', mse_neural)
+print('Mean absolute error from neural net: ', mae_neural)
+
+#Graph the perdictions with actual test data
+import numpy as np
+prdictions = np.squeeze(predictions)
+import matplotlib.pyplot as plt
+
+%matplotlib inline
+fig = plt.figure(figsize=(9, 6))
+# Plot predicted vs actual
+plt.scatter(y_test, prdictions, color = 'red')
+plt.xlabel('Actual Labels')
+plt.ylabel('Predicted Labels')
+plt.title('Deformation Predictions')
+# overlay the regression line
+z = np.polyfit(y_test,prdictions, 1)
+p = np.poly1d(z)
+plt.plot(y_test,p(y_test),  color='black', label = "Perfect Perdictions",linestyle='dotted', linewidth= 0.5)
+plt.legend()
+plt.show()
